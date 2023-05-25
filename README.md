@@ -1,7 +1,7 @@
 # vlazba / gimyzba
 
 ## Changes
-- This is an app rewritten from https://github.com/teleological/vlazba and https://github.com/lynn/vlazba .
+- This is an app rewritten from https://github.com/teleological/gimyzba and https://github.com/lynn/gimyzba .
 - Ported to Rust from Python 3
 
 ## Usage
