@@ -1,70 +1,57 @@
-use clap::__derive_refs::once_cell;
 use clap::{Arg, Command};
-use std::collections::HashSet;
-use std::fs::File;
-use std::io::{stderr, BufRead, BufReader, Write};
-use std::{println, process};
-use regex::Regex;
-
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
+use regex::Regex;
+use std::{
+    collections::HashSet,
+    fs::File,
+    io::{self, BufRead, BufReader},
+    process,
+};
 
 mod gismu_utils;
 use gismu_utils::{language_weights, GismuGenerator, GismuMatcher, GismuScorer, C, V};
 
 const VERSION: &str = "v0.5";
 
-use once_cell::sync::Lazy;
-
 static DEFAULT_WEIGHTS_STR: Lazy<String> = Lazy::new(|| {
     language_weights()
         .get("1985")
-        .unwrap()
-        .to_vec()
+        .expect("1985 weights should exist")
         .iter()
         .map(|&weight| weight.to_string())
-        .collect::<Vec<String>>()
+        .collect::<Vec<_>>()
         .join(",")
 });
 
 fn log(msg: &str) {
-    writeln!(&mut stderr(), "{}", msg).unwrap();
+    eprintln!("{}", msg);
 }
 
 fn split_string_to_letters(s: &str) -> Vec<String> {
-    s.chars().map(|c| c.to_string()).collect()
+    s.chars().map(String::from).collect()
 }
 
-fn generate_weights(weights_str: String) -> Vec<f32> {
-    let opt_str = "weights";
+fn generate_weights(weights_str: &str) -> Vec<f32> {
     let re = Regex::new(r"(\d{4}|finprims)$").unwrap();
-    let weights: Vec<f32>;
-    if re.is_match(&weights_str) {
-        if let Some(found_weights) = language_weights().get(weights_str.as_str()) {
-            log(&format!("Using language weights from {}...", weights_str));
-            weights = found_weights.to_vec();
-        } else {
-            panic!("No weights registered for {}", weights_str);
-        }
+    if re.is_match(weights_str) {
+        language_weights()
+            .get(weights_str)
+            .unwrap_or_else(|| panic!("No weights registered for {}", weights_str))
+            .to_vec()
     } else {
-        weights = weights_str
-        .split(',')
-        .map(|x| {
-            let weight = x.trim().parse::<f32>();
-            if weight.is_err() || weight.as_ref().unwrap() <= &0.0 {
-                panic!("Values for {} must be numbers greater than zero", opt_str);
-            }
-            weight.unwrap()
-        })
-        .collect::<Vec<f32>>();
-        if weights.len() < 2 {
-            panic!("{} must include at least 2 values", opt_str);
-        }
+        weights_str
+            .split(',')
+            .map(|x| {
+                x.trim().parse::<f32>().unwrap_or_else(|_| {
+                    panic!("Values for weights must be numbers greater than zero")
+                })
+            })
+            .collect()
     }
-    weights
 }
 
-
-fn main() {
+fn main() -> io::Result<()> {
     let matches = Command::new("Optimized Gismu Generator")
         .version(VERSION)
         .arg(Arg::new("words").help("Input words"))
@@ -72,8 +59,6 @@ fn main() {
             Arg::new("all-letters")
                 .short('a')
                 .long("all-letters")
-                .required(false)
-                .num_args(0)
                 .help("Use all letters"),
         )
         .arg(
@@ -98,26 +83,19 @@ fn main() {
         )
         .get_matches();
 
-    let binding = "".to_string();
     let words: Vec<String> = matches
         .get_one::<String>("words")
-        .unwrap_or(&binding)
-        .split(' ')
-        .collect::<Vec<&str>>()
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-    let all_letters = *matches.get_one::<bool>("all-letters").unwrap_or(&false);
-    let binding = "".to_string();
+        .map(|s| s.split_whitespace().map(String::from).collect())
+        .unwrap_or_default();
+    let all_letters = matches.contains_id("all-letters");
     let shapes: Vec<String> = matches
         .get_one::<String>("shapes")
-        .unwrap_or(&binding)
+        .unwrap()
         .split(',')
-        .map(|shape| shape.trim().to_string())
+        .map(str::trim)
+        .map(String::from)
         .collect();
-    let weights = generate_weights(matches
-        .get_one::<String>("weights")
-        .unwrap_or(&"".to_string()).clone());
+    let weights = generate_weights(matches.get_one::<String>("weights").unwrap());
 
     let gismu_list_path = matches.get_one::<String>("deduplicate");
 
@@ -133,16 +111,10 @@ fn main() {
     };
     log(&format!(
         "Using letters {} and {}.",
-        c.iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(","),
-        v.iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(",")
+        c.join(","),
+        v.join(",")
     ));
-    let shapes: Vec<String> = shapes.clone();
+
     let candidate_iterator = GismuGenerator::new(c, v, shapes);
     let candidates: Vec<String> = candidate_iterator.iterator();
     log(&format!("{} candidates generated.", candidates.len()));
@@ -154,26 +126,27 @@ fn main() {
         .map(|candidate| scorer.compute_score_with_name(candidate))
         .collect();
 
-    scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    scores.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
 
     log("\n10 first gismu candidates are:\n");
-    for record in &scores[..10] {
+    for record in scores.iter().take(10) {
         log(&format!("{:?}", record));
     }
 
     if let Some(gismu_list_path) = gismu_list_path {
         log("Reading list of gismu... ");
-        let gismus = read_gismu_list(gismu_list_path).unwrap();
+        let gismus = read_gismu_list(gismu_list_path)?;
         let matcher = GismuMatcher::new(&gismus, None);
         log("Excluding candidates similar to existing gismu...");
-        let candidate = deduplicate_candidates(&matcher, &scores);
-        if let Some(candidate) = candidate {
+        if let Some(candidate) = deduplicate_candidates(&matcher, &scores) {
             log("The winner is....");
             println!("{}", candidate.to_uppercase());
         } else {
             log("No suitable candidates found.");
         }
     }
+
+    Ok(())
 }
 
 fn letters_for_words(words: &[String]) -> (Vec<String>, Vec<String>) {
@@ -182,50 +155,42 @@ fn letters_for_words(words: &[String]) -> (Vec<String>, Vec<String>) {
     (
         C.chars()
             .filter(|&c| word_set.contains(&c))
-            .map(|c| c.to_string())
+            .map(String::from)
             .collect(),
         V.chars()
             .filter(|&c| word_set.contains(&c))
-            .map(|c| c.to_string())
+            .map(String::from)
             .collect(),
     )
 }
 
 fn deduplicate_candidates(
     matcher: &GismuMatcher,
-    scores: &Vec<(f32, &String, Vec<f32>)>,
+    scores: &[(f32, &String, Vec<f32>)],
 ) -> Option<String> {
-    scores
-        .iter()
-        .find_map(|(_, candidate, _)| {
-            matcher
-                .find_similar_gismu(candidate)
-                .map(|gismu| {
-                    log(&format!(
-                        "Candidate '{}' too much like gismu '{}'.",
-                        candidate, gismu
-                    ));
-                })
-                .map(|_| (*candidate.clone()).to_string())
+    scores.iter().find_map(|(_, candidate, _)| {
+        matcher.find_similar_gismu(candidate).map(|gismu| {
+            log(&format!(
+                "Candidate '{}' too much like gismu '{}'.",
+                candidate, gismu
+            ));
+            (*candidate).to_string()
         })
+    })
 }
 
-fn validate_words(words: &Vec<String>, weights: &Vec<f32>) -> Result<(), String> {
-    let weight_count = weights.len();
-    if words.len() != weight_count {
-        return Err(format!("Expected {} words as input", weight_count));
+fn validate_words(words: &[String], weights: &[f32]) -> Result<(), String> {
+    if words.len() != weights.len() {
+        return Err(format!("Expected {} words as input", weights.len()));
     }
-    for word in words {
-        if word.len() < 2 {
-            return Err("Input words must be at least two letters long".to_string());
-        }
+    if words.iter().any(|word| word.len() < 2) {
+        return Err("Input words must be at least two letters long".to_string());
     }
     Ok(())
 }
 
-fn read_gismu_list(path: &str) -> Result<Vec<String>, std::io::Error> {
+fn read_gismu_list(path: &str) -> io::Result<Vec<String>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
-    let gismus: Result<Vec<String>, _> = reader.lines().collect();
-    gismus
+    reader.lines().collect()
 }

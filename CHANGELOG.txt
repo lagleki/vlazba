@@ -1,3 +1,9 @@
+Version 0.6.1
+
+Improved performance.
+
+----
+
 Version 0.6
 
 Rewritten in Rust.
