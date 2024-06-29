@@ -1,6 +1,6 @@
 Version 0.7.0
 
-Added alpha port of [jvozba](https://github.com/sozysozbot/sozysozbot_jvozba/tree/master)
+Added alpha port of [la jvozba](https://github.com/sozysozbot/sozysozbot_jvozba/tree/master)
 
 ----
 Version 0.6.1
