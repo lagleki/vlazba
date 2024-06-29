@@ -107,7 +107,7 @@ fn main() -> anyhow::Result<()> {
         let exp_rafsi = matches.get_flag("exp_rafsi");
         let results = jvozba::jvozba(&words, forbid_la_lai_doi, exp_rafsi);
         for result in results {
-            println!("{}: {}", result.lujvo, result.score);
+            log(&format!("{}: {}", result.lujvo, result.score));
         }
         return Ok(());
     }
@@ -169,7 +169,7 @@ fn main() -> anyhow::Result<()> {
         log("Excluding candidates similar to existing gismu...");
         if let Some(candidate) = deduplicate_candidates(&matcher, &scores) {
             log("The winner is....");
-            println!("{}", candidate.to_uppercase());
+            log(&candidate.to_uppercase().to_string());
         } else {
             log("No suitable candidates found.");
         }
