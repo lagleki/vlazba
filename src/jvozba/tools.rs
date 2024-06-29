@@ -27,22 +27,36 @@ pub fn create_every_possibility<T: Clone + serde::Serialize + for<'de> serde::De
 
 pub fn gismu_rafsi_list(a: &str, exp_rafsi: bool) -> Option<Vec<String>> {
     if let Some(rafsi) = get_gismu_rafsi_list().get(a) {
-        Some(rafsi.clone())
-    } else if exp_rafsi {
-        get_gismu_rafsi_list_exp().get(a).cloned()
-    } else {
-        None
+        if !rafsi.is_empty() {
+            return Some(rafsi.clone());
+        }
     }
+
+    if exp_rafsi {
+        if let Some(rafsi) = get_gismu_rafsi_list_exp().get(a) {
+            if !rafsi.is_empty() {
+                return Some(rafsi.clone());
+            }
+        }
+    }
+    Some(Vec::<String>::new())
 }
 
 pub fn cmavo_rafsi_list(a: &str, exp_rafsi: bool) -> Option<Vec<String>> {
     if let Some(rafsi) = get_cmavo_rafsi_list().get(a) {
-        Some(rafsi.clone())
-    } else if exp_rafsi {
-        get_cmavo_rafsi_list_exp().get(a).cloned()
-    } else {
-        None
+        if !rafsi.is_empty() {
+            return Some(rafsi.clone());
+        }
     }
+
+    if exp_rafsi {
+        if let Some(rafsi) = get_cmavo_rafsi_list_exp().get(a) {
+            if !rafsi.is_empty() {
+                return Some(rafsi.clone());
+            }
+        }
+    }
+	None
 }
 
 pub fn get_candid(selrafsi: &str, is_last: bool, exp_rafsi: bool) -> Vec<String> {
@@ -61,8 +75,7 @@ pub fn get_candid(selrafsi: &str, is_last: bool, exp_rafsi: bool) -> Vec<String>
         if chopped != "brod" {
             candid.push(chopped);
         }
-
-        return candid;
+        candid
     } else {
         panic!("no rafsi for word {}", selrafsi);
     }

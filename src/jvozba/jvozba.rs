@@ -32,9 +32,9 @@ pub struct LujvoAndScore {
     pub score: i32,
 }
 
-pub fn jvozba(arr: &[String], forbid_la_lai_doi: bool) -> Vec<LujvoAndScore> {
+pub fn jvozba(arr: &[String], forbid_la_lai_doi: bool, exp_rafsi: bool) -> Vec<LujvoAndScore> {
     let candid_arr: Vec<Vec<String>> = arr.iter().enumerate()
-        .map(|(i, selrafsi)| get_candid(selrafsi, i == arr.len() - 1, false))
+        .map(|(i, selrafsi)| get_candid(selrafsi, i == arr.len() - 1, exp_rafsi))
         .collect();
 
     let mut answers: Vec<LujvoAndScore> = create_every_possibility(candid_arr)

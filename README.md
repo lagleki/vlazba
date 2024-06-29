@@ -58,10 +58,18 @@ To create lujvo using the jvozba algorithm:
 ./vlazba --jvozba "<word1> <word2> <word3>"
 ```
 
-Example:
+```bash
+./vlazba --jvozba --exp_rafsi "<word1> <word2> <word3>"
+```
+
+Examples:
 
 ```bash
 ./vlazba --jvozba "klama klama gasnu"
+```
+
+```bash
+./vlazba --jvozba --exp-rafsi "corci klama gasnu"
 ```
 
 ## Options
@@ -72,6 +80,13 @@ Example:
 - `-d, --deduplicate`: Path to existing gismu list for deduplication
 - `--jvozba`: Use jvozba function to create lujvo instead of gismu generation
 - `--forbid-la-lai-doi`: Forbid 'la', 'lai', 'doi' in lujvo when using jvozba
+- `--exp-rafsi`: Include experimental rafsi when generating lujvo
+
+## Debug
+
+```bash
+RUST_BACKTRACE=full cargo run -- "uan rakan ekspekt esper predpologa mulud"
+```
 
 ## Background
 

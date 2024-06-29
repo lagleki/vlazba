@@ -12,7 +12,7 @@ mod gismu_utils;
 use gismu_utils::{language_weights, GismuGenerator, GismuMatcher, GismuScorer, C, V};
 mod jvozba;
 
-const VERSION: &str = "v0.7";
+const VERSION: &str = "v0.7.1";
 
 static DEFAULT_WEIGHTS_STR: Lazy<String> = Lazy::new(|| {
     language_weights()
@@ -88,6 +88,13 @@ fn main() -> anyhow::Result<()> {
                 .num_args(0)
                 .action(clap::ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("exp_rafsi")
+                .long("exp-rafsi")
+                .help("All experimental rafsi when generating lujvo")
+                .num_args(0)
+                .action(clap::ArgAction::SetTrue),
+        )
         .get_matches();
 
     if matches.get_flag("jvozba") {
@@ -97,7 +104,8 @@ fn main() -> anyhow::Result<()> {
             .unwrap_or_default();
 
         let forbid_la_lai_doi = matches.get_flag("forbid_la_lai_doi");
-        let results = jvozba::jvozba(&words, forbid_la_lai_doi);
+        let exp_rafsi = matches.get_flag("exp_rafsi");
+        let results = jvozba::jvozba(&words, forbid_la_lai_doi, exp_rafsi);
         for result in results {
             println!("{}: {}", result.lujvo, result.score);
         }
