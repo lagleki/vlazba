@@ -1,10 +1,10 @@
 # vlazba / gimyzba / jvozba
 
-A Rust-based tool for generating Lojban gismu (root words) from transliterations of words in multiple languages, and for creating lujvo (compound words) using the jvozba algorithm.
+A Rust-based tool for generating Lojban gismu (root words) and lujvo (compound words).
 
 ## Features
 
-- Generates gismu based on input from multiple languages
+- Generates gismu based on input from transliterations of words in multiple languages
 - Creates lujvo using the jvozba algorithm
 - Customizable language weighting
 - Efficient Rust implementation
@@ -59,7 +59,7 @@ To create lujvo using the jvozba algorithm:
 ```
 
 ```bash
-./vlazba --jvozba --exp_rafsi "<word1> <word2> <word3>"
+./vlazba --jvozba --exp-rafsi "<word1> <word2> <word3>"
 ```
 
 Examples:
@@ -72,6 +72,28 @@ Examples:
 ./vlazba --jvozba --exp-rafsi "corci klama gasnu"
 ```
 
+### Lujvo Decomposition (jvokaha)
+
+To split lujvo using the jvokaha algorithm:
+
+```bash
+./vlazba --jvokaha "<lujvo>"
+```
+
+```bash
+./vlazba --jvokajha --exp-rafsi "<lujvo>"
+```
+
+Examples:
+
+```bash
+./vlazba --jvozba "klaklagau"
+```
+
+```bash
+./vlazba --jvozba --exp-rafsi "cocklagau"
+```
+
 ## Options
 
 - `-w, --weights`: Specify custom language weights (default: 0.347,0.196,0.160,0.123,0.089,0.085)
@@ -80,6 +102,7 @@ Examples:
 - `-d, --deduplicate`: Path to existing gismu list for deduplication
 - `--jvozba`: Use jvozba function to create lujvo instead of gismu generation
 - `--forbid-la-lai-doi`: Forbid 'la', 'lai', 'doi' in lujvo when using jvozba
+- `--jvokaha`: Use jvokaha function to split lujvo into components
 - `--exp-rafsi`: Include experimental rafsi when generating lujvo
 
 ## Debug

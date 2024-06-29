@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
+use std::collections::{HashMap, HashSet};
 
 pub const C: &str = "bcdfgjklmnprstvxz";
 pub const V: &str = "aeiou";
@@ -44,29 +44,20 @@ pub static SIMILARITIES: Lazy<HashMap<char, &'static str>> = Lazy::new(|| {
     .collect()
 });
 
-static VALID_CC_INITIALS_SET: Lazy<HashSet<&'static str>> = Lazy::new(|| {
-    VALID_CC_INITIALS.iter().cloned().collect()
-});
+static VALID_CC_INITIALS_SET: Lazy<HashSet<&'static str>> =
+    Lazy::new(|| VALID_CC_INITIALS.iter().cloned().collect());
 
-static FORBIDDEN_CC_SET: Lazy<HashSet<&'static str>> = Lazy::new(|| {
-    FORBIDDEN_CC.iter().cloned().collect()
-});
+static FORBIDDEN_CC_SET: Lazy<HashSet<&'static str>> =
+    Lazy::new(|| FORBIDDEN_CC.iter().cloned().collect());
 
-static FORBIDDEN_CCC_SET: Lazy<HashSet<&'static str>> = Lazy::new(|| {
-    FORBIDDEN_CCC.iter().cloned().collect()
-});
+static FORBIDDEN_CCC_SET: Lazy<HashSet<&'static str>> =
+    Lazy::new(|| FORBIDDEN_CCC.iter().cloned().collect());
 
-static SIBILANT_SET: Lazy<HashSet<char>> = Lazy::new(|| {
-    SIBILANT.chars().collect()
-});
+static SIBILANT_SET: Lazy<HashSet<char>> = Lazy::new(|| SIBILANT.chars().collect());
 
-static VOICED_SET: Lazy<HashSet<char>> = Lazy::new(|| {
-    VOICED.chars().collect()
-});
+static VOICED_SET: Lazy<HashSet<char>> = Lazy::new(|| VOICED.chars().collect());
 
-static UNVOICED_SET: Lazy<HashSet<char>> = Lazy::new(|| {
-    UNVOICED.chars().collect()
-});
+static UNVOICED_SET: Lazy<HashSet<char>> = Lazy::new(|| UNVOICED.chars().collect());
 
 pub fn get_string_value(key: char) -> &'static str {
     SIMILARITIES.get(&key).map_or(".", |&s| s)
@@ -155,16 +146,17 @@ impl GismuGenerator {
             })
             .collect()
     }
-
+    
     fn shape_validator(&self, shape: &str) -> impl Fn(&str) -> bool {
-        let predicates: Vec<Box<dyn Fn(&str) -> bool + Send + Sync>> = shape
+        type Predicate = Box<dyn Fn(&str) -> bool + Send + Sync>;
+    
+        let predicates: Vec<Predicate> = shape
             .chars()
             .zip(shape.chars().skip(1))
             .enumerate()
             .filter_map(|(i, (c1, c2))| {
                 if c1.to_ascii_lowercase() == 'c' && c2.to_ascii_lowercase() == 'c' {
-                    let mut p: Vec<Box<dyn Fn(&str) -> bool + Send + Sync>> =
-                        vec![Box::new(self.validator_for_cc(i))];
+                    let mut p: Vec<Predicate> = vec![Box::new(self.validator_for_cc(i))];
                     if shape.chars().nth(i + 2) == Some('c') {
                         p.push(Box::new(self.validator_for_ccc(i)));
                     }
@@ -178,7 +170,7 @@ impl GismuGenerator {
             })
             .flatten()
             .collect();
-
+    
         move |x: &str| predicates.iter().all(|p| p(x))
     }
 

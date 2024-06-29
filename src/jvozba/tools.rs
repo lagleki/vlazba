@@ -56,7 +56,7 @@ pub fn cmavo_rafsi_list(a: &str, exp_rafsi: bool) -> Option<Vec<String>> {
             }
         }
     }
-	None
+    None
 }
 
 pub fn get_candid(selrafsi: &str, is_last: bool, exp_rafsi: bool) -> Vec<String> {
@@ -82,8 +82,10 @@ pub fn get_candid(selrafsi: &str, is_last: bool, exp_rafsi: bool) -> Vec<String>
 }
 
 pub fn search_selrafsi_from_rafsi2(rafsi: &str, exp_rafsi: bool) -> Option<String> {
-    if gismu_rafsi_list(rafsi, exp_rafsi).is_some() {
-        return Some(rafsi.to_string());
+    if let Some(rafsis) = gismu_rafsi_list(rafsi, exp_rafsi) {
+        if !rafsis.is_empty() {
+            return Some(rafsi.to_owned());
+        }
     }
 
     if rafsi != "brod" && rafsi.len() == 4 && !rafsi.contains('\'') {
@@ -122,9 +124,4 @@ pub fn search_selrafsi_from_rafsi2(rafsi: &str, exp_rafsi: bool) -> Option<Strin
     }
 
     None
-}
-
-pub fn search_selrafsi_from_rafsi(rafsi: &str, exp_rafsi: bool) -> String {
-    search_selrafsi_from_rafsi2(rafsi, exp_rafsi)
-        .unwrap_or_else(|| panic!("no word for rafsi {}", rafsi))
 }

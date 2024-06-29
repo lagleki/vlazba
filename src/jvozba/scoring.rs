@@ -36,7 +36,3 @@ pub fn get_cv_info(v: &str) -> String {
         })
         .collect()
 }
-
-pub fn is_c(v: &str) -> bool {
-    v.chars().all(|c| "bcdfgjklmnprstvxz".contains(c))
-}

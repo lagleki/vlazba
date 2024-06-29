@@ -72,7 +72,7 @@ fn is_cmevla(valsi: &str) -> bool {
     valsi.chars().last().map_or(false, |c| !"aeiouy'".contains(c))
 }
 
-fn normalize(rafsi_list: &[String]) -> Vec<String> {
+pub fn normalize(rafsi_list: &[String]) -> Vec<String> {
     assert!(rafsi_list.len() >= 2, "You need at least two valsi to make a lujvo");
 
     let mut result: Vec<String> = Vec::with_capacity(rafsi_list.len() * 2 - 1);

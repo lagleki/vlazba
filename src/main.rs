@@ -1,4 +1,5 @@
 use clap::{Arg, Command};
+use jvozba::{jvokaha, tools::search_selrafsi_from_rafsi2};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
@@ -12,7 +13,7 @@ mod gismu_utils;
 use gismu_utils::{language_weights, GismuGenerator, GismuMatcher, GismuScorer, C, V};
 mod jvozba;
 
-const VERSION: &str = "v0.7.1";
+const VERSION: &str = "v0.7.2";
 
 static DEFAULT_WEIGHTS_STR: Lazy<String> = Lazy::new(|| {
     language_weights()
@@ -95,6 +96,13 @@ fn main() -> anyhow::Result<()> {
                 .num_args(0)
                 .action(clap::ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("jvokaha")
+                .long("jvokaha")
+                .help("Use jvokaha function to split lujvo")
+                .num_args(0)
+                .action(clap::ArgAction::SetTrue),
+        )
         .get_matches();
 
     if matches.get_flag("jvozba") {
@@ -108,6 +116,39 @@ fn main() -> anyhow::Result<()> {
         let results = jvozba::jvozba(&words, forbid_la_lai_doi, exp_rafsi);
         for result in results {
             log(&format!("{}: {}", result.lujvo, result.score));
+        }
+        return Ok(());
+    }
+
+    if matches.get_flag("jvokaha") {
+        let words: &str = matches
+            .get_one::<String>("words")
+            .map(String::as_str)
+            .unwrap_or("");
+
+        let results = jvokaha::jvokaha(words);
+
+        match results {
+            Ok(result) => {
+                let exp_rafsi = matches.get_flag("exp_rafsi");
+                let arr: Vec<String> = result
+                    .into_iter()
+                    .filter(|a| a.len() > 1)
+                    .map(|rafsi| {
+                        match search_selrafsi_from_rafsi2(&rafsi, exp_rafsi) {
+                            Some(selrafsi) => selrafsi,
+                            None => format!("-{}-", rafsi), // output as rafsi form; signify as unknown
+                        }
+                    })
+                    .collect();
+                log("Successfully decomposed lujvo:");
+                for (index, rafsi) in arr.iter().enumerate() {
+                    log(&format!("  {}: {}", index + 1, rafsi));
+                }
+            }
+            Err(e) => {
+                log(&format!("Error: {}", e));
+            }
         }
         return Ok(());
     }
