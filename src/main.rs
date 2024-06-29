@@ -13,7 +13,7 @@ mod gismu_utils;
 use gismu_utils::{language_weights, GismuGenerator, GismuMatcher, GismuScorer, C, V};
 mod jvozba;
 
-const VERSION: &str = "v0.7.2";
+const VERSION: &str = "v0.7.3";
 
 static DEFAULT_WEIGHTS_STR: Lazy<String> = Lazy::new(|| {
     language_weights()
