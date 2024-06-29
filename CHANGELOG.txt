@@ -1,3 +1,8 @@
+Version 0.7.0
+
+Added alpha port of [jvozba](https://github.com/sozysozbot/sozysozbot_jvozba/tree/master)
+
+----
 Version 0.6.1
 
 Improved performance.

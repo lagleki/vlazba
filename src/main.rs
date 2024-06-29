@@ -6,13 +6,13 @@ use std::{
     collections::HashSet,
     fs::File,
     io::{self, BufRead, BufReader},
-    process,
 };
 
 mod gismu_utils;
 use gismu_utils::{language_weights, GismuGenerator, GismuMatcher, GismuScorer, C, V};
+mod jvozba;
 
-const VERSION: &str = "v0.5";
+const VERSION: &str = "v0.7";
 
 static DEFAULT_WEIGHTS_STR: Lazy<String> = Lazy::new(|| {
     language_weights()
@@ -28,30 +28,23 @@ fn log(msg: &str) {
     eprintln!("{}", msg);
 }
 
-fn split_string_to_letters(s: &str) -> Vec<String> {
-    s.chars().map(String::from).collect()
-}
-
-fn generate_weights(weights_str: &str) -> Vec<f32> {
-    let re = Regex::new(r"(\d{4}|finprims)$").unwrap();
+fn generate_weights(weights_str: &str) -> anyhow::Result<Vec<f32>> {
+    let re = Regex::new(r"(\d{4}|finprims)$")?;
     if re.is_match(weights_str) {
         language_weights()
             .get(weights_str)
-            .unwrap_or_else(|| panic!("No weights registered for {}", weights_str))
-            .to_vec()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("No weights registered for {}", weights_str))
     } else {
         weights_str
             .split(',')
-            .map(|x| {
-                x.trim().parse::<f32>().unwrap_or_else(|_| {
-                    panic!("Values for weights must be numbers greater than zero")
-                })
-            })
-            .collect()
+            .map(|x| x.trim().parse::<f32>())
+            .collect::<Result<Vec<f32>, _>>()
+            .map_err(|_| anyhow::anyhow!("Values for weights must be numbers greater than zero"))
     }
 }
 
-fn main() -> io::Result<()> {
+fn main() -> anyhow::Result<()> {
     let matches = Command::new("Optimized Gismu Generator")
         .version(VERSION)
         .arg(Arg::new("words").help("Input words"))
@@ -81,7 +74,35 @@ fn main() -> io::Result<()> {
                 .long("deduplicate")
                 .help("Path to gismu list for deduplication"),
         )
+        .arg(
+            Arg::new("jvozba")
+                .long("jvozba")
+                .help("Use jvozba function instead of gismu generation")
+                .num_args(0)
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("forbid_la_lai_doi")
+                .long("forbid-la-lai-doi")
+                .help("Forbid la, lai, doi in lujvo")
+                .num_args(0)
+                .action(clap::ArgAction::SetTrue),
+        )
         .get_matches();
+
+    if matches.get_flag("jvozba") {
+        let words: Vec<String> = matches
+            .get_one::<String>("words")
+            .map(|s| s.split_whitespace().map(String::from).collect())
+            .unwrap_or_default();
+
+        let forbid_la_lai_doi = matches.get_flag("forbid_la_lai_doi");
+        let results = jvozba::jvozba(&words, forbid_la_lai_doi);
+        for result in results {
+            println!("{}: {}", result.lujvo, result.score);
+        }
+        return Ok(());
+    }
 
     let words: Vec<String> = matches
         .get_one::<String>("words")
@@ -95,17 +116,17 @@ fn main() -> io::Result<()> {
         .map(str::trim)
         .map(String::from)
         .collect();
-    let weights = generate_weights(matches.get_one::<String>("weights").unwrap());
+    let weights = generate_weights(matches.get_one::<String>("weights").unwrap())?;
 
     let gismu_list_path = matches.get_one::<String>("deduplicate");
 
-    if let Err(e) = validate_words(&words, &weights) {
-        log(&e);
-        process::exit(1);
-    }
+    validate_words(&words, &weights)?;
 
     let (c, v) = if all_letters {
-        (split_string_to_letters(C), split_string_to_letters(V))
+        (
+            C.chars().map(String::from).collect(),
+            V.chars().map(String::from).collect(),
+        )
     } else {
         letters_for_words(&words)
     };
@@ -179,12 +200,12 @@ fn deduplicate_candidates(
     })
 }
 
-fn validate_words(words: &[String], weights: &[f32]) -> Result<(), String> {
+fn validate_words(words: &[String], weights: &[f32]) -> anyhow::Result<()> {
     if words.len() != weights.len() {
-        return Err(format!("Expected {} words as input", weights.len()));
+        anyhow::bail!("Expected {} words as input", weights.len());
     }
     if words.iter().any(|word| word.len() < 2) {
-        return Err("Input words must be at least two letters long".to_string());
+        anyhow::bail!("Input words must be at least two letters long");
     }
     Ok(())
 }
