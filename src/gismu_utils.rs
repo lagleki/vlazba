@@ -1,48 +1,11 @@
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use smallvec::SmallVec;
+use std::collections::HashSet;
 
-pub const C: &str = "bcdfgjklmnprstvxz";
-pub const V: &str = "aeiou";
-
-const VALID_CC_INITIALS: &[&str] = &[
-    "bl", "br", "cf", "ck", "cl", "cm", "cn", "cp", "cr", "ct", "dj", "dr", "dz", "fl", "fr", "gl",
-    "gr", "jb", "jd", "jg", "jm", "jv", "kl", "kr", "ml", "mr", "pl", "pr", "sf", "sk", "sl", "sm",
-    "sn", "sp", "sr", "st", "tc", "tr", "ts", "vl", "vr", "xl", "xr", "zb", "zd", "zg", "zm", "zv",
-];
-
-const FORBIDDEN_CC: &[&str] = &["cx", "kx", "xc", "xk", "mz"];
-
-const FORBIDDEN_CCC: &[&str] = &["ndj", "ndz", "ntc", "nts"];
-
-const SIBILANT: &str = "cjsz";
-const VOICED: &str = "bdgjvz";
-const UNVOICED: &str = "cfkpstx";
-
-pub static SIMILARITIES: Lazy<HashMap<char, &'static str>> = Lazy::new(|| {
-    [
-        ('b', "pv"),
-        ('c', "js"),
-        ('d', "t"),
-        ('f', "pv"),
-        ('g', "kx"),
-        ('j', "cz"),
-        ('k', "gx"),
-        ('l', "r"),
-        ('m', "n"),
-        ('n', "m"),
-        ('p', "bf"),
-        ('r', "l"),
-        ('s', "cz"),
-        ('t', "d"),
-        ('v', "bf"),
-        ('x', "gk"),
-        ('z', "js"),
-    ]
-    .iter()
-    .cloned()
-    .collect()
-});
+use crate::libs::config::{
+    FORBIDDEN_CC, FORBIDDEN_CCC, SIBILANT, SIMILARITIES, UNVOICED, VALID_CC_INITIALS, VOICED,
+};
 
 static VALID_CC_INITIALS_SET: Lazy<HashSet<&'static str>> =
     Lazy::new(|| VALID_CC_INITIALS.iter().cloned().collect());
@@ -59,43 +22,32 @@ static VOICED_SET: Lazy<HashSet<char>> = Lazy::new(|| VOICED.chars().collect());
 
 static UNVOICED_SET: Lazy<HashSet<char>> = Lazy::new(|| UNVOICED.chars().collect());
 
-pub fn get_string_value(key: char) -> &'static str {
-    SIMILARITIES.get(&key).map_or(".", |&s| s)
-}
-
-pub fn language_weights() -> HashMap<&'static str, Vec<f32>> {
-    [
-        ("1985", vec![0.36, 0.16, 0.21, 0.11, 0.09, 0.07]),
-        ("1987", vec![0.36, 0.156, 0.208, 0.116, 0.087, 0.073]),
-        ("1994", vec![0.348, 0.194, 0.163, 0.123, 0.088, 0.084]),
-        ("1995", vec![0.347, 0.196, 0.16, 0.123, 0.089, 0.085]),
-        ("1999", vec![0.334, 0.195, 0.187, 0.116, 0.081, 0.088]),
-    ]
-    .iter()
-    .cloned()
-    .collect()
-}
-
 fn lcs_length(a: &str, b: &str) -> f32 {
-    let a_chars: Vec<char> = a.chars().collect();
-    let b_chars: Vec<char> = b.chars().collect();
-    let (m, n) = (a_chars.len(), b_chars.len());
-    let mut dp = vec![0; n + 1];
+    let (a_bytes, b_bytes) = (a.as_bytes(), b.as_bytes());
+    let (m, n) = (a_bytes.len(), b_bytes.len());
+    
+    // Ensure a is the shorter string to optimize space usage
+    if m > n {
+        return lcs_length(b, a);
+    }
+    
+    // Use a single vector, initialized with zeros
+    let mut current = vec![0; m + 1];
 
-    for i in 1..=m {
+    for j in 1..=n {
         let mut prev = 0;
-        for j in 1..=n {
-            let temp = dp[j];
-            if a_chars[i - 1] == b_chars[j - 1] {
-                dp[j] = prev + 1;
+        for i in 1..=m {
+            let temp = current[i];
+            if a_bytes[i - 1] == b_bytes[j - 1] {
+                current[i] = prev + 1;
             } else {
-                dp[j] = dp[j].max(dp[j - 1]);
+                current[i] = current[i].max(current[i - 1]);
             }
             prev = temp;
         }
     }
 
-    dp[n] as f32
+    current[m] as f32
 }
 
 pub struct GismuGenerator {
@@ -123,16 +75,23 @@ impl GismuGenerator {
     fn shape_iterator(&self, shape_string: &str) -> Vec<String> {
         let shape = self.shape_for_string(shape_string);
         let validator = self.shape_validator(shape_string);
-
-        shape
-            .iter()
-            .fold(vec![String::new()], |a, b| {
-                a.into_iter()
-                    .flat_map(|x| b.iter().map(move |y| x.clone() + y))
-                    .collect()
+    
+        (0..shape.iter().map(|v| v.len()).product::<usize>())
+            .into_par_iter()
+            .filter_map(move |index| {
+                let mut candidate = String::with_capacity(shape.len());
+                let mut remaining = index;
+                for choices in &shape {
+                    let choice_index = remaining % choices.len();
+                    remaining /= choices.len();
+                    candidate.push_str(&choices[choice_index]);
+                }
+                if validator(&candidate) {
+                    Some(candidate)
+                } else {
+                    None
+                }
             })
-            .into_iter()
-            .filter(|x| validator(x))
             .collect()
     }
 
@@ -146,10 +105,10 @@ impl GismuGenerator {
             })
             .collect()
     }
-    
+
     fn shape_validator(&self, shape: &str) -> impl Fn(&str) -> bool {
         type Predicate = Box<dyn Fn(&str) -> bool + Send + Sync>;
-    
+
         let predicates: Vec<Predicate> = shape
             .chars()
             .zip(shape.chars().skip(1))
@@ -170,7 +129,7 @@ impl GismuGenerator {
             })
             .flatten()
             .collect();
-    
+
         move |x: &str| predicates.iter().all(|p| p(x))
     }
 
@@ -203,19 +162,19 @@ impl GismuGenerator {
 
 pub struct GismuScorer<'a> {
     input_words: &'a [String],
-    weights: &'a [f32],
+    weights: SmallVec<[f32; 6]>,
 }
 
 impl<'a> GismuScorer<'a> {
-    pub fn new(input_words: &'a [String], weights: &'a [f32]) -> Self {
+    pub fn new(input_words: &'a [String], weights: &[f32]) -> Self {
         Self {
             input_words,
-            weights,
+            weights: SmallVec::from_slice(weights),
         }
     }
 
-    fn compute_score(&self, candidate: &str) -> (f32, Vec<f32>) {
-        let similarity_scores: Vec<f32> = self
+    fn compute_score(&self, candidate: &str) -> (f32, SmallVec<[f32; 6]>) {
+        let similarity_scores: SmallVec<[f32; 6]> = self
             .input_words
             .iter()
             .map(|word| {
@@ -236,7 +195,7 @@ impl<'a> GismuScorer<'a> {
     pub fn compute_score_with_name<'b>(
         &self,
         candidate: &'b String,
-    ) -> (f32, &'b String, Vec<f32>) {
+    ) -> (f32, &'b String, SmallVec<[f32; 6]>) {
         let (weighted_sum, similarity_scores) = self.compute_score(candidate);
         (weighted_sum, candidate, similarity_scores)
     }
@@ -269,10 +228,10 @@ impl<'a> GismuScorer<'a> {
         score
     }
 
-    fn calculate_weighted_sum(&self, scores: &[f32]) -> f32 {
+    fn calculate_weighted_sum(&self, scores: &SmallVec<[f32; 6]>) -> f32 {
         scores
             .iter()
-            .zip(self.weights)
+            .zip(self.weights.iter())
             .map(|(&score, &weight)| score * weight)
             .sum()
     }
@@ -293,44 +252,40 @@ impl<'a> GismuMatcher<'a> {
 
     pub fn find_similar_gismu(&self, candidate: &str) -> Option<String> {
         let candidate = candidate.trim_end();
-        let patterns: Vec<String> = candidate
-            .chars()
-            .map(|c| get_string_value(c).to_string())
-            .collect();
 
         self.gismus
             .iter()
-            .find(|word| self.match_gismu(word, candidate, &patterns))
+            .find(|word| self.match_gismu(word, candidate))
             .cloned()
     }
 
-    fn match_gismu(&self, gismu: &str, candidate: &str, structural_patterns: &[String]) -> bool {
-        self.match_stem(gismu, candidate)
-            || self.match_structure(gismu, candidate, structural_patterns)
+    fn match_gismu(&self, gismu: &str, candidate: &str) -> bool {
+        self.match_stem(gismu, candidate) || self.match_structure(gismu, candidate)
+    }
+
+    fn match_structure(&self, gismu: &str, candidate: &str) -> bool {
+        let common_len = candidate.len().min(gismu.len());
+        (0..common_len).any(|i| {
+            self.strings_match_except(gismu, candidate, i, common_len)
+                && self
+                    .match_structural_pattern(&gismu[i..i + 1], candidate.chars().nth(i).unwrap())
+        })
+    }
+
+    fn match_structural_pattern(&self, letter: &str, c: char) -> bool {
+        SIMILARITIES
+            .iter()
+            .find(|&&(key, _)| key == c.to_ascii_lowercase())
+            .map_or(false, |&(_, pattern)| {
+                pattern.contains(letter) || pattern.is_empty()
+            })
     }
 
     fn match_stem(&self, gismu: &str, candidate: &str) -> bool {
         candidate.len() >= self.stem_length && gismu.starts_with(&candidate[..self.stem_length])
     }
 
-    fn match_structure(
-        &self,
-        gismu: &str,
-        candidate: &str,
-        structural_patterns: &[String],
-    ) -> bool {
-        let common_len = candidate.len().min(gismu.len());
-        (0..common_len).any(|i| {
-            self.strings_match_except(gismu, candidate, i, common_len)
-                && self.match_structural_pattern(&gismu[i..i + 1], &structural_patterns[i])
-        })
-    }
-
     fn strings_match_except(&self, x: &str, y: &str, i: usize, j: usize) -> bool {
         x[..i] == y[..i] && x[(i + 1)..j] == y[(i + 1)..j]
-    }
-
-    fn match_structural_pattern(&self, letter: &str, pattern: &str) -> bool {
-        pattern == "." || pattern.contains(letter)
     }
 }

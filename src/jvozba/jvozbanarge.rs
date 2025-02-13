@@ -32,6 +32,15 @@ pub struct LujvoAndScore {
     pub score: i32,
 }
 
+/// Generate possible lujvo combinations from a list of selrafsi
+/// 
+/// # Arguments
+/// * `arr` - List of selrafsi (Lojban root words)
+/// * `forbid_la_lai_doi` - Whether to forbid certain cmavo in lujvo
+/// * `exp_rafsi` - Whether to include experimental rafsi
+/// 
+/// # Returns
+/// Vector of LujvoAndScore structs sorted by best score first
 pub fn jvozba(arr: &[String], forbid_la_lai_doi: bool, exp_rafsi: bool) -> Vec<LujvoAndScore> {
     let candid_arr: Vec<Vec<String>> = arr.iter().enumerate()
         .map(|(i, selrafsi)| get_candid(selrafsi, i == arr.len() - 1, exp_rafsi))

@@ -17,6 +17,13 @@ impl fmt::Display for LujvoError {
 
 impl Error for LujvoError {}
 
+/// Split a lujvo into its constituent rafsi
+/// 
+/// # Arguments
+/// * `lujvo` - The compound word to analyze
+/// 
+/// # Returns
+/// Result with vector of rafsi or error message
 pub fn jvokaha(lujvo: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let arr = jvokaha2(lujvo)?;
     let rafsi_list: Vec<String> = arr.iter().filter(|a| a.len() != 1).cloned().collect();

@@ -1,6 +1,11 @@
-# vlazba / gimyzba / jvozba
+# vlazba
 
-A Rust-based tool for generating Lojban gismu (root words) and lujvo (compound words).
+[![crates.io](https://img.shields.io/crates/v/vlazba.svg)](https://crates.io/crates/vlazba)
+[![Docs](https://docs.rs/vlazba/badge.svg)](https://docs.rs/vlazba)
+
+A Rust library and CLI for Lojban lujvo (compound word) generation and analysis.
+
+Implements the gismu clash and jvozba algorithms described in [The Complete Lojban Language](https://lojban.github.io/cll/13/4/).
 
 ## Features
 
@@ -21,33 +26,59 @@ A Rust-based tool for generating Lojban gismu (root words) and lujvo (compound w
 2. Clone the repository and build the project:
 
    ```bash
-   git clone https://github.com/your-username/vlazba.git
+   git clone https://github.com/la-lojban/vlazba.git
    cd vlazba
    cargo build --release
    ```
 
-3. The executable will be available at `target/release/vlazba`
+3. Install the CLI tool:
+   ```bash
+   cargo install vlazba --bin gimka
+   ```
 
-## Usage
+## As a Library
+
+Add to your Cargo.toml:
+```toml
+[dependencies]
+vlazba = "0.7"
+```
+
+Basic usage:
+```rust
+use vlazba::{jvozba, jvokaha};
+
+// Generate lujvo candidates
+let results = vlazba::jvozba(
+    &["klama".to_string(), "gasnu".to_string()], 
+    false, 
+    false
+);
+
+// Analyze existing lujvo
+let decomposition = jvokaha::jvokaha("kalga'u").unwrap();
+```
+
+## CLI Usage
 
 ### Gismu Generation
 
 Basic usage:
 
 ```bash
-./vlazba "<Mandarin> <Hindi> <English> <Spanish> <Russian> <Arabic>"
+./target/release/vlazba "<Mandarin> <Hindi> <English> <Spanish> <Russian> <Arabic>"
 ```
 
 Example:
 
 ```bash
-./vlazba "uan rakan ekspekt esper predpologa mulud"
+./target/release/vlazba "uan rakan ekspekt esper predpologa mulud"
 ```
 
 Custom weights:
 
 ```bash
-./vlazba -w 0.271,0.170,0.130,0.125,0.104,0.076,0.064,0.060 mandarin english spanish hindi arabic bengali russian portuguese
+./target/release/vlazba -w 0.271,0.170,0.130,0.125,0.104,0.076,0.064,0.060 mandarin english spanish hindi arabic bengali russian portuguese
 ```
 
 ### Lujvo Creation (jvozba)
@@ -55,21 +86,21 @@ Custom weights:
 To create lujvo using the jvozba algorithm:
 
 ```bash
-./vlazba --jvozba "<word1> <word2> <word3>"
+./target/release/vlazba --jvozba "<word1> <word2> <word3>"
 ```
 
 ```bash
-./vlazba --jvozba --exp-rafsi "<word1> <word2> <word3>"
+./target/release/vlazba --jvozba --exp-rafsi "<word1> <word2> <word3>"
 ```
 
 Examples:
 
 ```bash
-./vlazba --jvozba "klama klama gasnu"
+./target/release/vlazba --jvozba "klama klama gasnu"
 ```
 
 ```bash
-./vlazba --jvozba --exp-rafsi "corci klama gasnu"
+./target/release/vlazba --jvozba --exp-rafsi "corci klama gasnu"
 ```
 
 ### Lujvo Decomposition (jvokaha)
@@ -77,21 +108,21 @@ Examples:
 To split lujvo using the jvokaha algorithm:
 
 ```bash
-./vlazba --jvokaha "<lujvo>"
+./target/release/vlazba --jvokaha "<lujvo>"
 ```
 
 ```bash
-./vlazba --jvokajha --exp-rafsi "<lujvo>"
+./target/release/vlazba --jvokajha --exp-rafsi "<lujvo>"
 ```
 
 Examples:
 
 ```bash
-./vlazba --jvozba "klaklagau"
+./target/release/vlazba --jvozba "klaklagau"
 ```
 
 ```bash
-./vlazba --jvozba --exp-rafsi "cocklagau"
+./target/release/vlazba --jvozba --exp-rafsi "cocklagau"
 ```
 
 ## Options

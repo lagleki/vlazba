@@ -1,48 +1,23 @@
 use clap::{Arg, Command};
-use jvozba::{jvokaha, tools::search_selrafsi_from_rafsi2};
-use once_cell::sync::Lazy;
+use jvozba::{jvokaha, tools::search_selrafsi_from_rafsi2, jvozba};
 use rayon::prelude::*;
-use regex::Regex;
 use std::{
     collections::HashSet,
     fs::File,
     io::{self, BufRead, BufReader},
+    sync::Arc,
 };
+use smallvec::SmallVec;
+
+mod libs;
+use libs::{cli::{generate_weights, validate_words}, config::{C, DEFAULT_WEIGHTS_STR, V, VERSION}};
 
 mod gismu_utils;
-use gismu_utils::{language_weights, GismuGenerator, GismuMatcher, GismuScorer, C, V};
+use gismu_utils::{GismuGenerator, GismuMatcher, GismuScorer};
 mod jvozba;
-
-const VERSION: &str = "v0.7.3";
-
-static DEFAULT_WEIGHTS_STR: Lazy<String> = Lazy::new(|| {
-    language_weights()
-        .get("1985")
-        .expect("1985 weights should exist")
-        .iter()
-        .map(|&weight| weight.to_string())
-        .collect::<Vec<_>>()
-        .join(",")
-});
 
 fn log(msg: &str) {
     eprintln!("{}", msg);
-}
-
-fn generate_weights(weights_str: &str) -> anyhow::Result<Vec<f32>> {
-    let re = Regex::new(r"(\d{4}|finprims)$")?;
-    if re.is_match(weights_str) {
-        language_weights()
-            .get(weights_str)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("No weights registered for {}", weights_str))
-    } else {
-        weights_str
-            .split(',')
-            .map(|x| x.trim().parse::<f32>())
-            .collect::<Result<Vec<f32>, _>>()
-            .map_err(|_| anyhow::anyhow!("Values for weights must be numbers greater than zero"))
-    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -108,7 +83,7 @@ fn main() -> anyhow::Result<()> {
     if matches.get_flag("jvozba") {
         let words: Vec<String> = matches
             .get_one::<String>("words")
-            .map(|s| s.split_whitespace().map(String::from).collect())
+            .map(|s| s.split_whitespace().map(|word| word.to_string()).collect())
             .unwrap_or_default();
 
         let forbid_la_lai_doi = matches.get_flag("forbid_la_lai_doi");
@@ -155,7 +130,7 @@ fn main() -> anyhow::Result<()> {
 
     let words: Vec<String> = matches
         .get_one::<String>("words")
-        .map(|s| s.split_whitespace().map(String::from).collect())
+        .map(|s| s.split_whitespace().map(|word| word.to_string()).collect())
         .unwrap_or_default();
     let all_letters = matches.contains_id("all-letters");
     let shapes: Vec<String> = matches
@@ -163,7 +138,7 @@ fn main() -> anyhow::Result<()> {
         .unwrap()
         .split(',')
         .map(str::trim)
-        .map(String::from)
+        .map(|s| s.to_string())
         .collect();
     let weights = generate_weights(matches.get_one::<String>("weights").unwrap())?;
 
@@ -173,8 +148,8 @@ fn main() -> anyhow::Result<()> {
 
     let (c, v) = if all_letters {
         (
-            C.chars().map(String::from).collect(),
-            V.chars().map(String::from).collect(),
+            C.chars().map(|s| s.to_string()).collect(),
+            V.chars().map(|s| s.to_string()).collect(),
         )
     } else {
         letters_for_words(&words)
@@ -191,10 +166,11 @@ fn main() -> anyhow::Result<()> {
 
     let scorer = GismuScorer::new(&words, &weights);
 
-    let mut scores: Vec<(f32, &String, Vec<f32>)> = candidates
-        .par_iter()
-        .map(|candidate| scorer.compute_score_with_name(candidate))
-        .collect();
+    let mut scores: Vec<(f32, &String, SmallVec<[f32; 6]>)> = candidates
+    .par_iter()
+    .map(|candidate| scorer.compute_score_with_name(candidate))
+    .collect();
+    
 
     scores.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
 
@@ -206,7 +182,7 @@ fn main() -> anyhow::Result<()> {
     if let Some(gismu_list_path) = gismu_list_path {
         log("Reading list of gismu... ");
         let gismus = read_gismu_list(gismu_list_path)?;
-        let matcher = GismuMatcher::new(&gismus, None);
+        let matcher = Arc::new(GismuMatcher::new(&gismus, None));
         log("Excluding candidates similar to existing gismu...");
         if let Some(candidate) = deduplicate_candidates(&matcher, &scores) {
             log("The winner is....");
@@ -225,20 +201,20 @@ fn letters_for_words(words: &[String]) -> (Vec<String>, Vec<String>) {
     (
         C.chars()
             .filter(|&c| word_set.contains(&c))
-            .map(String::from)
+            .map(|s| s.to_string())
             .collect(),
         V.chars()
             .filter(|&c| word_set.contains(&c))
-            .map(String::from)
+            .map(|s| s.to_string())
             .collect(),
     )
 }
 
 fn deduplicate_candidates(
-    matcher: &GismuMatcher,
-    scores: &[(f32, &String, Vec<f32>)],
+    matcher: &Arc<GismuMatcher>,
+    scores: &[(f32, &String, SmallVec<[f32; 6]>)],
 ) -> Option<String> {
-    scores.iter().find_map(|(_, candidate, _)| {
+    scores.par_iter().find_map_any(|(_, candidate, _)| {
         matcher.find_similar_gismu(candidate).map(|gismu| {
             log(&format!(
                 "Candidate '{}' too much like gismu '{}'.",
@@ -247,16 +223,6 @@ fn deduplicate_candidates(
             (*candidate).to_string()
         })
     })
-}
-
-fn validate_words(words: &[String], weights: &[f32]) -> anyhow::Result<()> {
-    if words.len() != weights.len() {
-        anyhow::bail!("Expected {} words as input", weights.len());
-    }
-    if words.iter().any(|word| word.len() < 2) {
-        anyhow::bail!("Input words must be at least two letters long");
-    }
-    Ok(())
 }
 
 fn read_gismu_list(path: &str) -> io::Result<Vec<String>> {
