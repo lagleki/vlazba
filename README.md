@@ -112,17 +112,17 @@ To split lujvo using the jvokaha algorithm:
 ```
 
 ```bash
-./target/release/vlazba --jvokajha --exp-rafsi "<lujvo>"
+./target/release/vlazba --jvokaha --exp-rafsi "<lujvo>"
 ```
 
 Examples:
 
 ```bash
-./target/release/vlazba --jvozba "klaklagau"
+./target/release/vlazba --jvokaha "klaklagau"
 ```
 
 ```bash
-./target/release/vlazba --jvozba --exp-rafsi "cocklagau"
+./target/release/vlazba --jvokaha --exp-rafsi "cocklagau"
 ```
 
 ## Options
