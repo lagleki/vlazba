@@ -1,4 +1,4 @@
-use jvozba::{jvozba, jvokaha};
+use vlazba::{jvozba, jvokaha};
 
 fn main() {
     // Generate lujvo candidates

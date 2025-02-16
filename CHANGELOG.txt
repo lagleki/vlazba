@@ -1,3 +1,17 @@
+Version 0.7.5
+
+Update jvozba/jvokaha example
+
+Fix documentation
+
+----
+
+Version 0.7.4
+
+Update documentation, publish on crates.io
+
+----
+
 Version 0.7.0
 
 Added alpha port of [la jvozba](https://github.com/sozysozbot/sozysozbot_jvozba/tree/master)
