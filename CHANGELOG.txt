@@ -1,8 +1,12 @@
+Version 0.7.6
+
+Fix documentation examples and jvozba integration
+
+----
+
 Version 0.7.5
 
-Update jvozba/jvokaha example
-
-Fix documentation
+Update jvozba/jvokaha examples
 
 ----
 

@@ -88,7 +88,7 @@ fn main() -> anyhow::Result<()> {
 
         let forbid_la_lai_doi = matches.get_flag("forbid_la_lai_doi");
         let exp_rafsi = matches.get_flag("exp_rafsi");
-        let results = jvozba::jvozba(&words, forbid_la_lai_doi, exp_rafsi);
+        let results = jvozba(&words, forbid_la_lai_doi, exp_rafsi);
         for result in results {
             log(&format!("{}: {}", result.lujvo, result.score));
         }

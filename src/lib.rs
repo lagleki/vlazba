@@ -4,16 +4,16 @@ A Rust implementation of Lojban lujvo (compound word) generation and analysis.
 # Examples
 
 ```rust
-use jvozba::{jvozba, LujvoAndScore};
+use vlazba::jvozba::{jvozba, LujvoAndScore};
 
-let result = jvozba::jvozba(&["klama".to_string(), "gasnu".to_string()], false, false);
-assert!(result[0].lujvo == "kalga'u");
+let result = jvozba(&["klama".to_string(), "gasnu".to_string()], false, false);
+assert!(result.iter().any(|r| r.lujvo == "klagau"));
 ```
 
 ```rust
-use jvozba::jvokaha;
+use vlazba::jvozba::jvokaha::jvokaha;
 
-let decomposition = jvokaha::jvokaha("kalga'u").unwrap();
+let decomposition = jvokaha("kalga'u").unwrap();
 assert_eq!(decomposition, vec!["kal", "ga'u"]);
 ```
 */

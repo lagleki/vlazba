@@ -46,14 +46,14 @@ vlazba = "0.7"
 
 Basic usage:
 ```rust
-use vlazba::{jvozba, jvokaha};
+use vlazba::jvozba::{jvozba, LujvoAndScore};
 
-// Generate lujvo candidates
-let results = vlazba::jvozba(
-    &["klama".to_string(), "gasnu".to_string()], 
-    false, 
-    false
-);
+ let results = jvozba(
+     &["klama".to_string(), "gasnu".to_string()],
+     false,
+     false
+ );
+ assert!(results.iter().any(|r| r.lujvo == "klagau"));
 
 // Analyze existing lujvo
 let decomposition = jvokaha::jvokaha("kalga'u").unwrap();
